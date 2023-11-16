@@ -13,7 +13,6 @@ if (require("pacman") == FALSE){
 
 # Loading in my packages with my pacman manager
 pacman::p_load(here,
-               MASS,
                tidyverse)
 
 # Adding custom functions
@@ -43,7 +42,12 @@ for (COL in 1:ncol(df)){
       example[INDEX] <- -100
     }
   }
-  rm(INDEX)
   df[,COL] <- example
 }
+rm(INDEX, COL, example)
+```
+
+```{r}
+Sliding_Window_Cor(x = df[,1],
+                   y = df[,2])
 ```
