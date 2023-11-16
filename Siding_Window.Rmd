@@ -1,0 +1,194 @@
+---
+title: "Sliding_Window"
+author: "Mitchell, W.J."
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r Setup}
+# Checking for pacman
+if (require("pacman") == FALSE){
+  install.packages("pacman")
+}
+
+# Loading in my packages with my pacman manager
+pacman::p_load(here,
+               MASS,
+               tidyverse)
+
+# Adding custom functions
+source("HRF_convolve.R")
+
+# Setting Working Directory
+WorkDir <- here::here()
+
+# Setting Seed
+set.seed(123)
+```
+
+```{r Generating Fake Data}
+df <- as.data.frame(matrix(data = NA, 
+                           nrow = 660, 
+                           ncol = 20))
+for (COL in 1:ncol(df)){
+  example <- c(0, sample(seq(-5, 5, 5), 659, replace = T))
+  for (INDEX in 2:length(example)){
+    example[INDEX] <- example[INDEX -1] + example[INDEX]
+    if (example[INDEX] > 100){
+      example[INDEX] <- 100
+    }
+    if (example[INDEX] < -100){
+      example[INDEX] <- -100
+    }
+  }
+  rm(INDEX)
+  df[,COL] <- example
+}
+head(df)
+```
+
+```{r Specifying Constants}
+# Specifying window size, sigma, step size, TR and number of Timepoints
+window_size <- c(32, 40, 48)[2]
+sigma <- 3
+step_size <- 1
+TR <- 2
+nVols <- (1337 - 17)/2
+```
+ 
+```{r Standardizing Data}
+# Z-Score each participants data relative to themselves
+for (COL in 1:ncol(df)){
+  df[,COL] <- scale(df[,COL]) %>%
+              as.numeric()
+}
+head(df)
+```
+
+```{r Generating an Group Average Timepoint by Timepoint}
+# Calculate the mean z-score within each time point across participants to represent average engagement, uncertainty, etc.
+average <- rep(NA, nrow(df))
+for (INDEX in 1:nrow(df)){
+  average[INDEX] <- mean(as.numeric(df[INDEX,]))
+}
+plot(average,ylim = c(-0.4, 0.4), type = "l")
+```
+
+```{r  Linearly convolving the average signal with the HRF weights}
+conv_average <- HRF_convolve(series = average,
+                             resample_q = TR)
+plot(conv_average,ylim = c(-0.4, 0.4), type = "l")
+```
+
+```{r Generating a Gaussian distribution for convolution}
+## Generating the median and series indices 
+if ((nVols %% 2) != 0){
+  median <- ceiling(nVols/2)
+  series_index <- 0:nVols
+}
+if ((nVols %% 2) == 0){
+  median <- nVols/2
+  series_index <- 0:(nVols-1)
+}
+median
+series_index
+```
+
+```{r Defining the radius of the sliding window}
+(window <- round(window_size/2))
+```
+
+```{r Creating a Gaussian window}
+gauss_window <- exp(-((c(series_index-median)^2) / (2 * sigma^2)))
+plot(gauss_window, type = "l")
+which(gauss_window == max(gauss_window))
+gauss_window[327:335]
+```
+
+```{r Creating a sample series on which to apply the window}
+series_sample <- rep(0, nVols)
+```
+
+```{r Applying the window (i.e., changing 0's to 1's)}
+series_sample[(median - window + 1):(median + window)] <- 1
+plot(series_sample, type = "l")
+length(series_sample[series_sample != 0])
+which(series_sample == max(series_sample))
+```
+```{r}
+convolution <- convolve(y = gauss_window, 
+                            x= series_sample, 
+                            type = "open")
+plot(convolution, type = "l")
+which(convolution == max(convolution))
+```
+```{r}
+convolution <- convolution/max(convolution)
+plot(convolution, type = "l")
+which(convolution == max(convolution))
+```
+
+
+```{r}
+convolution <- convolution[(median + 1):(length(convolution) - median + 1)]
+plot(convolution, type = "l")
+which(convolution == max(convolution))
+```
+
+```{r}
+convolution <- convolution[1:nVols]
+plot(convolution, type = "l")
+which(convolution == max(convolution))
+```
+
+```{r}
+nWindow <- nVols - window
+tcwin <- as.data.frame(matrix(data = 0, 
+                              nrow = nVols,
+                              ncol = nWindow))
+```
+
+```{r Define a function that mimics MATLABs circshift for vectors}
+circshift <- function(series, 
+                      shift) {
+  
+  # Ensuring that the shift is not greater than the series length
+  shift <- shift %% length(series)
+  
+  # Concatenating the last section of the series to the first section of the series, indexed by its beginning, end, and where the cut is occurring
+  c(tail(series, length(series) - shift), head(series, shift))
+}
+```
+
+```{r}
+indices <- ((1:nWindow) + (window/2))
+for (WINDOW in indices){
+
+    convolution_shift <- circshift(convolution, 
+                                   median - WINDOW)
+    
+    # If the convolution is spilling over from the front to the back
+    # If the iteration we're on is in the first half of indices, but there are non-zero values at the tail
+    if (WINDOW < median & convolution_shift[length(convolution_shift)] != 0){
+      convolution_shift[median:length(convolution_shift)] <- 0
+      convolution_shift <- convolution_shift * (sum(convolution)/sum(convolution_shift))
+    }
+    # If the convolution is spilling over from the back to the front
+    # If the iteration we're on is in the latter half of indices, but there are non-zero values at the start
+    if (WINDOW > median & convolution_shift[1] != 0){
+      convolution_shift[1:median] <- 0
+      convolution_shift <- convolution_shift * (sum(convolution)/sum(convolution_shift))
+    }
+    
+  tcwin[,WINDOW - (window/2)] <- average * convolution_shift
+}
+
+tcwin <- round(tcwin, digits = 5)
+```
+
+```{r}
+# normalize for a final round after sliding-window
+sliding_ts <- as.numeric(scale(rowSums(tcwin, na.rm = T)))
+plot(average, type = "l")
+plot(sliding_ts, type = "l")
+```

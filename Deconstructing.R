@@ -17,6 +17,9 @@ pacman::p_load(here,
                signal,
                tidyverse)
 
+# Adding custom functions
+source("HRF_convolve.R")
+
 # Setting Working Directory
 WorkDir <- here::here()
 
@@ -79,7 +82,7 @@ weight <- c(0,
          0)
 
 # Resampling the convlution based upon the TR as needed
-weight = resample(weight, p = 1, q = TR)
+weight = 
 
 # Linearly convolving the average signal with the HRF weights
 conv_average <- convolve(y = average, 
