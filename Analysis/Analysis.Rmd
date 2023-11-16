@@ -1,0 +1,61 @@
+---
+title: "01_Analysis"
+author: "William J. Mitchell"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r Libraries}
+library(data.table)
+library(lme4)
+library(lmerTest)
+library(performance)
+library(tidyverse)
+```
+
+```{r Reading in Data}
+  df_neuro <- fread("S:/Helion_Group/studies/uncertainty/studies_neuro/analysis/df_neuro.csv",
+                    stringsAsFactors = T)[-1]
+
+  df_behav <- read.csv("S:/Helion_Group/studies/uncertainty/studies_neuro/analysis/df_behav.csv",
+                       stringsAsFactors = T,
+                       row.names = 1)
+```
+
+```{r Cleaning Behav Data}
+df_behav$PID <- str_replace_all(string = df_behav$PID,
+                                pattern = "SR-",
+                                replacement = "sub-") %>%
+                str_extract_all(pattern = "sub-[0-9][0-9][0-9][0-9]") %>%
+                unlist()
+
+df_behav$Run <- "run-2" 
+df_behav$Run[df_behav$Condition == "A"] <- "run-1" 
+
+df_behav <- df_behav[,-which(names(df_behav) == "Condition")]
+```
+
+```{r Cleaning Neuro Data}
+  df_neuro <- subset(df_neuro,
+                     df_neuro$Value != 0, select = c(Value, PID, Run, ROI))
+
+  df_neuro <- df_neuro %>%
+              group_by(PID, ROI, Run) %>%
+              mutate(value_mean = mean(Value)) %>%
+              .[,-c(1)] %>%
+              distinct()
+```
+
+```{r Merging Data}
+df <- merge(df_neuro,
+            df_behav,
+            by = c("PID", "Run"))
+```
+
+```{r Analyses}
+
+n1 <- lmer(value_mean ~ 1 + (1 | PID), df[grep(df$ROI, pattern = "OFC"),], REML = F)
+icc(n1)
+m1 <- lmer(value_mean ~ cert_mean * certvar_sum + (1 | PID), df[grep(df$ROI, pattern = "OFC"),], REML = F)
+summary(m1)
+```
