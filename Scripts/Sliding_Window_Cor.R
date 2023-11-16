@@ -2,10 +2,9 @@
 
 Sliding_Window_Cor <- function(x,
                                y,
-                               window_size = 40,
+                               window_size,
                                sigma = 3,
                                step_size = 1,
-                               zscore = T,
                                cor_use = "pairwise.complete.obs",
                                cor_method = "spearman"){
   
@@ -29,10 +28,6 @@ Sliding_Window_Cor <- function(x,
   if (!is.numeric(step_size) | step_size < 1){
     stop("Step size must be a non-zero numeric value. Please correct this and try again")
   }
-  
-  if (!is.logical(zscore)){
-    stop("Z score must take either a True or False value. Please correct this and try again")
-  }
 
 # ----- SETUP -----
   # Checking for pacman
@@ -47,13 +42,7 @@ Sliding_Window_Cor <- function(x,
   source("circle_shift.R")
 
 # ----- DATA PREP -----
-  
-  if (zscore == T){
-    # Z-Score each participants data relative to themselves
-    data_x <- as.numeric(scale(x))
-    data_y <- as.numeric(scale(y))
-  }
-  
+
   # Calculating how many volumes there are 
   nVols <- length(x)
 
@@ -137,7 +126,7 @@ Sliding_Window_Cor <- function(x,
 # ----- GENERATING OUTPUT -----
   
 # Return the correlation values
-  return(mean(cor_sw))
+  return(cor_sw)
 }
   
   

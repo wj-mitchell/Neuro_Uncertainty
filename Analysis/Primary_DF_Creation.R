@@ -3,7 +3,7 @@ pacman::p_load(here, lme4, lmerTest, tidyverse)
 
 ## Adding custom function
 source("https://raw.githubusercontent.com/wj-mitchell/neuRotools/main/cormat_long.R", local= T)
-source("https://raw.githubusercontent.com/wj-mitchell/Uncertainty_Neuro/main/Sliding_Window_Cor.R", local= T)
+source("https://raw.githubusercontent.com/wj-mitchell/Neuro_Uncertainty/main/Scripts/Sliding_Window_Cor.R?token=GHSAT0AAAAAACJC62QPRN5K3APIPOMFHWJIZKWTFHA", local= T)
 
 ## Establishing working directory
 here()
@@ -119,7 +119,9 @@ if (df_created == FALSE){
 }
 
 ## Reading in neural correaltion data
-df_cor <- read.csv("S:/Helion_Group/studies/uncertainty/studies_neuro/data/df_cor_AvgROI.csv",row.names = 1, stringsAsFactors = T)
+df_cor <- read.csv(paste0(here(), "/Github/Neuro_Uncertainty/Analysis/data/df_cor_AvgROI.csv"),
+                          row.names = 1, 
+                          stringsAsFactors = T)
 
 ## Reading in other data
 df_cor_SH <- read.csv("S:/Helion_Group/studies/uncertainty/studies_neuro/analysis/corabs_behav_SH.csv",row.names = 1, stringsAsFactors = T)
