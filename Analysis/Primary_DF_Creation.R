@@ -3,13 +3,13 @@ pacman::p_load(here, lme4, lmerTest, tidyverse)
 
 ## Adding custom function
 source("https://raw.githubusercontent.com/wj-mitchell/neuRotools/main/cormat_long.R", local= T)
-source("https://raw.githubusercontent.com/wj-mitchell/Neuro_Uncertainty/main/Scripts/Sliding_Window_Cor.R?token=GHSAT0AAAAAACJC62QPRN5K3APIPOMFHWJIZKWTFHA", local= T)
+source("https://raw.githubusercontent.com/wj-mitchell/Neuro_Uncertainty/main/Scripts/Sliding_Window_Cor.R?token=GHSAT0AAAAAACKJMS6G23D4BOZHTJAJX44YZKXR4PA", local= T)
 
 ## Establishing working directory
 here()
 
 ## Has the dataframe been created already?
-df_created = TRUE
+df_created = FALSE
 
 ## Create the original correlation dataframe
 if (df_created == FALSE){
