@@ -1,0 +1,166 @@
+---
+title: "DF_Create"
+author: "William J. Mitchell"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r Setup}
+## Loading Packages
+pacman::p_load(here, 
+               lme4, 
+               lmerTest, 
+               tidyverse)
+
+## Adding custom function
+source("https://raw.githubusercontent.com/wj-mitchell/neuRotools/main/cormat_long.R", local= T)
+source(paste0(here(), "/Analysis/Sliding_Window_Cor.R"), local= T)
+```
+
+```{r Creating an array of the files to be loaded}
+files <- list.files(paste0(here(), "/Data/AvgROI/"), 
+                    full.names = TRUE)
+```
+
+```{r Creating a null array to house PIDs}
+PIDs <- NULL
+```
+
+```{r Constructing a Dataframe of ratings}
+## Iterating through each of these files
+for (FILE in 1:length(files)){
+  
+  ## Reading in the data for this iteration
+  df_ <- read.csv(files[FILE])
+  
+  ## Identifying the Participant ID for this file 
+  PID <- sub(".*/sub-(\\d+)_.*", "\\1", files[FILE])
+  
+  ## If the PID isn't present in the PIDs array
+  if (all(PIDs != PID)){
+    
+    ## add the PID to the array
+    PIDs <- c(PIDs, PID)
+  }
+  
+  ## Identifying the Run for this participant
+  Run <- sub(".*/sub-\\d+_(run-\\d+)_.*", "\\1", files[FILE])
+  
+  ## Renaming the column headers
+  names(df_) <- paste0("sub-", PID, "_", Run, "_ROI-",1:ncol(df_))
+  
+  # If the participant's file has 759 datapoints 
+  if (nrow(df_) == 759){
+    
+    # Create an onset sequence that removes the first 90 and last 90 seconds, plus the 17 second buffer
+    df_ <- df_[(1 + 45 + 9):(nrow(df_) - 45),]
+  }
+  
+  # If the participant's file has 729 datapoints
+  if (nrow(df_) == 729){
+    
+    # Create an onset sequence that removes the first 60 and last 60 seconds, plus the 17 second buffer
+    df_ <- df_[(1 + 30 + 9):(nrow(df_) - 30),]
+  }
+  
+  ## If this is the first file
+  if (FILE == 1){
+    
+    ## Make it the standard
+    df <- df_
+  }
+  
+  ## If it's a later file
+  if (FILE > 1){
+    
+    ## Bind the columns together
+    df <- cbind(df, df_)
+  }
+}
+  
+## Cleaning the space
+rm(Run, PID, files, FILE, df_)
+```
+
+```{r Defining Window Size}
+Window_Size <- 40
+```
+
+```{r Creating a new dataframe to host the}
+rows <- 1:(nrow(df) - (Window_Size/2))
+cols <- c("PID1", "PID2", "Run", "Region", "Window", "Value_Cor_Neuro")
+df_model <- as.data.frame(matrix(NA,
+                               nrow = length(rows), 
+                               ncol = length(cols),
+                               dimnames = list(rows, cols)))
+
+rm(rows,cols)
+```
+
+```{r Filling The Dataframe}
+## Iterating through each run
+for (RUN in 1) {
+  
+  ## and iterating through each of the ROIs
+  for (ROI in 1:200){
+    
+    ## Identifying the Data that is Comparable to Correlate
+    df_cor_ <- grep(pattern = paste0("run-", RUN, "_ROI-", ROI, "$"),
+                    x = names(df), 
+                    value = TRUE) %>%
+               df[,.]
+    
+    ## Iterating through the Different Combinations
+    for (PID1 in 1:(ncol(df_cor_) - 1)){
+      for (PID2 in 2:ncol(df_cor_)){
+        if (PID2 > PID1){
+          
+          # Creating a new dataframe with the structure of df_cor
+          df_temp <- df_model
+          
+          # Filling in information
+          df_temp$PID1 <- sub("(_run-.*)", "", names(df_cor_)[PID1])
+          df_temp$PID2 <- sub("(_run-.*)", "", names(df_cor_)[PID2])
+          df_temp$Run <- RUN
+          df_temp$Region <- ROI
+          df_temp$Window <- 1:nrow(df_temp)
+          df_temp$Value_Cor_Neuro <- Sliding_Window_Cor(x = df_cor_[,PID1],
+                                                        y = df_cor_[,PID2],
+                                                        window_size = Window_Size)
+          
+          ## If this is the first iteration
+          if (PID1 == 1 & PID2 == 2){
+            
+            ## Make the generated dataframe the standard
+            df_cor <- df_temp
+          }
+          
+          ## If this is a later iteration
+          if (PID1 != 1 | PID2 != 2){
+            
+            ## Bind the rows together
+            df_cor <- rbind(df_cor,
+                            df_temp)
+          }
+        }
+      }
+      
+      # Print Progress
+      print(paste0("RUN: ", RUN, " | ROI: ", ROI, " | PID1: ", PID1))
+    }
+    
+    ## Save the current dataframe
+    write.csv(df_cor,
+              paste0(here(),"/Data/Sliding_Window/Run_",RUN,"ROI_", ROI,".csv"))
+  }
+}
+
+## Cleaning Our Space
+rm(df_cor_, ROI, RUN)
+```
+
+
+
+
+
+

@@ -1,0 +1,104 @@
+---
+title: "01_DFCreation"
+author: "William J Mitchell"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r Checking the Status of the pacman package}
+  # If the pacman package manager is not currently installed on this system, install it.
+  if (require("pacman") == FALSE){
+    install.packages("pacman")
+  }
+```
+
+```{r Loading Packages}
+  pacman::p_load(here,
+                 tidyverse)
+```
+
+```{r Specifying Our Directories}
+  # Identifying our main directory
+  WorkDir <- "/data/Uncertainty"
+
+  # Identifying specific directories to read and write from
+  Raw <- paste0(WorkDir, "/copes/")
+```
+
+# Reading In Data
+
+
+```{r Building Our Dataframe, message=FALSE, warning=FALSE}
+  # List all of the files to read in
+  files <- list.files(path = Raw,
+                      full.names = F)[1:5]
+
+  # Iterating through each of those files
+  for (FILE in files){
+    
+    # Reading in the first three rows, which contain coordinate information in MNI space (I think)
+    df_temp <- read.csv(paste0(Raw, FILE),
+                   header = F, 
+                   sep = " ",
+                   row.names = c("X","Y","Z","Value"))[1:3,] %>%
+      
+          # Transposing that dataframe so that it's three columns instead of three rows
+          t() %>%
+      
+          # Fixing transpose's restructuring to make sure it's a dataframe
+          as.data.frame() %>%
+      
+          # Removing NA values that might occur due to the separator
+          subset(!is.na(df$X))
+    
+    # Creating a series of coordinate objects; one for each dimension 
+    x <- paste0("X", df_temp$X)
+    y <- paste0("Y", df_temp$Y)
+    z <- paste0("Z", df_temp$Z)
+    
+    # Concatenating all of those objects together into a single array of coordinates which we'll feed into a dataframe
+    coords <- paste(x,y,z, sep = "_")
+    
+    # Reading in the values only, tranposing, saving as a dataframe, and removing NAs
+    df_temp <- read.csv(paste0(Raw, FILE),
+                   header = F, 
+                   sep = " ",
+                   row.names = c("X","Y","Z","Value"))[4,] %>%
+          t() %>%
+          as.data.frame() %>%
+          subset(!is.na(df$Value))
+    
+    # Creating a new column of coordinates for each of the values
+    df_temp$Voxel <- coords
+    
+    # Creating a new column recording the cope name
+    df_temp$Cope <- FILE
+    
+    # If this is the first file
+    if (FILE == files[1]){
+      
+      # Save it as dataframe DF
+      df <- df_temp
+    }
+    
+    # If this is not the first file
+    if (FILE != files[1]){
+      
+      # Append it to the end of dataframe DF
+      df <- rbind(df, df_temp)
+    }
+    
+    # Clean our space
+    rm(a,y,z,df_temp,coords)
+  }
+```
+
+
+```{r Building Our Dataframe, message=FALSE, warning=FALSE}
+  df <- list.files(path = Raw, 
+                   full.names = TRUE) %>%
+               # Removing every file and directory that's not a .CSV
+               .[str_detect(pattern = ".csv", string = .)] %>%
+               # Reading in each .CSV and appending it to the end of the previous one
+               ldply(read_csv)
+```

@@ -1,0 +1,74 @@
+---
+title: "01_Analysis"
+author: "William J. Mitchell"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r Libraries}
+library(data.table)
+library(lavaan)
+library(lme4)
+library(lmerTest)
+library(performance)
+library(tidyverse)
+```
+
+```{r Reading in Data}
+  df_behav <- read.csv("C:/Users/Administrator/Desktop/TO_SORT/uncertainty/studies_neuro/analysis/df_behav.csv",
+                       stringsAsFactors = T,
+                       row.names = 1)
+```
+
+```{r Cleaning Behav Data}
+df_behav$PID <- str_replace_all(string = df_behav$PID,
+                                pattern = "SR-",
+                                replacement = "sub-") %>%
+                str_extract_all(pattern = "sub-[0-9][0-9][0-9][0-9]") %>%
+                unlist()
+
+df_behav$Run <- "run-2" 
+df_behav$Run[df_behav$Condition == "A"] <- "run-1" 
+
+df_behav <- df_behav[,-which(names(df_behav) == "Condition")]
+```
+
+```{r Generating Independent Subsetted Dataframes}
+df_Run1 <- subset(df_behav, 
+                  df_behav$Run == "run-1",
+                  select = c("PID", "CertRate", "SecondEnd")) %>%
+           pivot_wider(names_from = PID, values_from = CertRate)
+df_Run2 <- subset(df_behav,
+                  df_behav$Run == "run-2",
+                  select = c("PID", "CertRate", "SecondEnd")) %>%
+           pivot_wider(names_from = PID, values_from = CertRate)
+```
+
+```{r Generating Models Based Upon Hypotheses}
+model_Run1 <- ' Jonathan =~ `sub-2758` + `sub-3951` + `sub-6269` + `sub-6773` + `sub-6799` + `sub-8607` + `sub-9827`
+                NotJonathan =~ `sub-0757` + `sub-1371` + `sub-2610` + `sub-3046` + `sub-3801` + `sub-4590` + `sub-6021` + `sub-8746` + `sub-9907` '
+
+model_Run2 <- ' Jonathan =~ `sub-0035` + `sub-3011` + `sub-5006` + `sub-6971`
+                NotJonathan =~  `sub-3274` + `sub-4781` + `sub- 6977` + `sub-7255` + `sub-7492` + `sub-8929`'
+
+```
+
+```{r Running the cfa for the first half}
+fit <- cfa(model_Run1, data = df_Run1)
+summary(fit, fit.measures = TRUE)
+```
+
+```{r Running the cfa for the second half}
+fit <- cfa(model_Run2, data = df_Run2)
+summary(fit, fit.measures = TRUE)
+```
+
+```{r Conducting an exploratory factor analysis}
+results <- psych::fa(df_Run1[2:ncol(df_Run1)], nfactors = 2, rotate = "varimax", use = "pairwise")
+print(results, digits=2, cutoff=0.3,sort=TRUE)
+```
+
+```{r Conducting an exploratory factor analysis}
+results <- psych::fa(df_Run2[2:ncol(df_Run2)], nfactors = 2, rotate = "varimax", use = "pairwise")
+print(results, digits=2, cutoff=0.3,sort=TRUE)
+```
