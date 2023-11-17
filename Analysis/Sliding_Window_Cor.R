@@ -116,9 +116,9 @@ Sliding_Window_Cor <- function(x,
       convol_shift <- convol_shift * (sum(convol)/sum(convol_shift))
     }
     
-    # 
-    cor_sw[which(indices == WINDOW)] <- cor(x = data_x * convol_shift,
-                                            y = data_y * convol_shift,
+    # Generating Correlations
+    cor_sw[which(indices == WINDOW)] <- cor(x = x * convol_shift,
+                                            y = y * convol_shift,
                                             method = cor_method,
                                             use = cor_use) 
   }
