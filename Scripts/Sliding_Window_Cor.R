@@ -5,7 +5,7 @@ Sliding_Window_Cor <- function(x,
                                window_size,
                                sigma = 3,
                                step_size = 1,
-                               cor_use = "pairwise.complete.obs",
+                               cor_use = "complete.obs",
                                cor_method = "spearman"){
   
 # ----- QA CHECKS -----
