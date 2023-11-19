@@ -17,7 +17,7 @@ pacman::p_load(doMC,
 
 ## Adding custom function
 source("https://raw.githubusercontent.com/wj-mitchell/neuRotools/main/cormat_long.R", local= T)
-source(paste0(here(), "/Analysis/Sliding_Window_Cor.R"), local= T)
+source("https://raw.githubusercontent.com/wj-mitchell/neuRotools/main/Sliding_Window_Cor.R", local= T)
 ```
 
 ```{r Creating an array of the files to be loaded}
