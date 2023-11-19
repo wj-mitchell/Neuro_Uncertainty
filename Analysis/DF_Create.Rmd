@@ -7,7 +7,9 @@ output: html_document
 
 ```{r Setup}
 ## Loading Packages
-pacman::p_load(here, 
+pacman::p_load(doMC,
+               foreach,
+               here, 
                lme4, 
                lmerTest, 
                tidyverse)
@@ -97,12 +99,16 @@ df_model <- as.data.frame(matrix(NA,
 rm(rows,cols)
 ```
 
+```{r Initializing our Parallel Processing Capabilities}
+registerDoMC(40)
+```
+
 ```{r Filling The Dataframe}
 ## Iterating through each run
-for (RUN in 1) {
+foreach(RUN=1:2)  %dopar% {
   
   ## and iterating through each of the ROIs
-  for (ROI in 1:200){
+  foreach(ROI=1:400) %dopar% {
     
     ## Identifying the Data that is Comparable to Correlate
     df_cor_ <- grep(pattern = paste0("run-", RUN, "_ROI-", ROI, "$"),
