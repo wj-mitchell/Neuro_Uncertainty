@@ -103,6 +103,15 @@ Sliding_Window_Cor <- function(x,
     convol_shift <- circle_shift(convol, 
                                  median - WINDOW)
     
+    # Identify where the window cutoffs should occur
+    cutoffs <- c(WINDOW - window_radius, WINDOW + window_radius)
+    if (any(cutoffs < 1)){
+      cutoffs[which(cutoffs < 1)] <- 1
+    }
+    if (any(cutoffs > nVols)){
+      cutoffs[which(cutoffs > nVols)] <- nVols
+    }
+    
     # If the convol is spilling over from the front to the back
     # If the iteration we're on is in the first half of indices, but there are non-zero values at the tail
     if (WINDOW < median & convol_shift[length(convol_shift)] != 0){
@@ -116,9 +125,15 @@ Sliding_Window_Cor <- function(x,
       convol_shift <- convol_shift * (sum(convol)/sum(convol_shift))
     }
     
+    # Convolving data and shaving off 0's
+    data_x <- x * convol_shift 
+    data_x <- data_x[cutoffs[1]:cutoffs[2]]
+    data_y <- y * convol_shift 
+    data_y <- data_y[cutoffs[1]:cutoffs[2]]
+    
     # Generating Correlations
-    cor_sw[which(indices == WINDOW)] <- cor(x = x * convol_shift,
-                                            y = y * convol_shift,
+    cor_sw[which(indices == WINDOW)] <- cor(x = data_x,
+                                            y = data_y,
                                             method = cor_method,
                                             use = cor_use) 
   }
