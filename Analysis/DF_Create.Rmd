@@ -89,15 +89,12 @@ Window_Sizes <- c(30,40,50)
 nROI <- 400
 ```
 
-```{r Initializing our Parallel Processing Capabilities}
-registerDoMC(60)
-```
+It seems that running multiple window sizes at once isn't really working out well so I'm going to have to do those sequentially
 
 ```{r Filling The Dataframe}
 ## Iterating through the different window sizes
-foreach(WINDOW=Window_sizes) %dopar%{
+for (WINDOW in Window_Sizes){
   
-  ## Creating a model dataframe to store the data
   rows <- 1:(nrow(df) - (WINDOW/2))
   cols <- c("PID1", "PID2", "Run", "Region", "Window", "Value_Cor_Neuro")
   df_model <- as.data.frame(matrix(NA,
@@ -107,7 +104,7 @@ foreach(WINDOW=Window_sizes) %dopar%{
   rm(rows,cols)
 
   ## Iterating through each run
-  foreach(RUN=1:2)  %dopar% {
+  foreach(RUN=1:2)  %:% {
     
     ## and iterating through each of the ROIs
     foreach(ROI=1:nROI) %dopar% {
@@ -134,7 +131,7 @@ foreach(WINDOW=Window_sizes) %dopar%{
             df_temp$Window <- 1:nrow(df_temp)
             df_temp$Value_Cor_Neuro <- Sliding_Window_Cor(x = df_cor_[,PID1],
                                                           y = df_cor_[,PID2],
-                                                          window_size = Window_Size)
+                                                          window_size = WINDOW)
             
             ## If this is the first iteration
             if (PID1 == 1 & PID2 == 2){
