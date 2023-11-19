@@ -12,6 +12,7 @@ pacman::p_load(doMC,
                here, 
                lme4, 
                lmerTest, 
+               parallel,
                tidyverse)
 
 ## Adding custom function
@@ -89,12 +90,15 @@ Window_Sizes <- c(30,40,50)
 nROI <- 400
 ```
 
-It seems that running multiple window sizes at once isn't really working out well so I'm going to have to do those sequentially
+```{r Adding Parallel Backend}
+registerDoMC(detectCores()/2)
+```
 
 ```{r Filling The Dataframe}
-## Iterating through the different window sizes
-for (WINDOW in Window_Sizes){
+## Iterating through differently sized windows
+for (WINDOW in Window_Sizes) {
   
+  ## Creating a model dataframe to reference
   rows <- 1:(nrow(df) - (WINDOW/2))
   cols <- c("PID1", "PID2", "Run", "Region", "Window", "Value_Cor_Neuro")
   df_model <- as.data.frame(matrix(NA,
@@ -102,12 +106,12 @@ for (WINDOW in Window_Sizes){
                                  ncol = length(cols),
                                  dimnames = list(rows, cols)))
   rm(rows,cols)
-
+  
   ## Iterating through each run
-  foreach(RUN=1:2)  %:% {
+  foreach(RUN=1:1)  %:% 
     
     ## and iterating through each of the ROIs
-    foreach(ROI=1:nROI) %dopar% {
+    foreach(ROI=1:2) %dopar% {
   
       ## Identifying the Data that is Comparable to Correlate
       df_cor_ <- grep(pattern = paste0("run-", RUN, "_ROI-", ROI, "$"),
@@ -158,13 +162,12 @@ for (WINDOW in Window_Sizes){
       write.csv(df_cor,
                 paste0(here(),"/Data/Sliding_Window/nROI-", nROI,"_WinSize-", WINDOW,"_Run-",RUN,"_ROI-", ROI,".csv"))
     }
-  }
 }
-
-## Cleaning Our Space
-rm(df_cor_, ROI, RUN)
 ```
 
+```{r Cleaning Our Space}
+rm(df_cor_, ROI, RUN)
+```
 
 
 
