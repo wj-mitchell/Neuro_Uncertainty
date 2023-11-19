@@ -85,7 +85,7 @@ rm(Run, PID, files, FILE, df_)
 ```
 
 ```{r Defining Window Size & Max ROI}
-Window_Size <- 40
+Window_Sizes <- c(30,40,50)
 nROI <- 400
 ```
 
@@ -105,60 +105,64 @@ registerDoMC(60)
 ```
 
 ```{r Filling The Dataframe}
-## Iterating through each run
-foreach(RUN=1:2)  %dopar% {
-  
-  ## and iterating through each of the ROIs
-  foreach(ROI=1:nROI) %dopar% {
+## Iterating through the different window sizes
+foreach(WINDOW=Window_sizes) %dopar%{
 
-    ## Identifying the Data that is Comparable to Correlate
-    df_cor_ <- grep(pattern = paste0("run-", RUN, "_ROI-", ROI, "$"),
-                    x = names(df), 
-                    value = TRUE) %>%
-               df[,.]
+  ## Iterating through each run
+  foreach(RUN=1:2)  %dopar% {
     
-    ## Iterating through the Different Combinations
-    for (PID1 in 1:(ncol(df_cor_) - 1)){
-      for (PID2 in 2:ncol(df_cor_)){
-        if (PID2 > PID1){
-          
-          # Creating a new dataframe with the structure of df_cor
-          df_temp <- df_model
-          
-          # Filling in information
-          df_temp$PID1 <- sub("(_run-.*)", "", names(df_cor_)[PID1])
-          df_temp$PID2 <- sub("(_run-.*)", "", names(df_cor_)[PID2])
-          df_temp$Run <- RUN
-          df_temp$Region <- ROI
-          df_temp$Window <- 1:nrow(df_temp)
-          df_temp$Value_Cor_Neuro <- Sliding_Window_Cor(x = df_cor_[,PID1],
-                                                        y = df_cor_[,PID2],
-                                                        window_size = Window_Size)
-          
-          ## If this is the first iteration
-          if (PID1 == 1 & PID2 == 2){
+    ## and iterating through each of the ROIs
+    foreach(ROI=1:nROI) %dopar% {
+  
+      ## Identifying the Data that is Comparable to Correlate
+      df_cor_ <- grep(pattern = paste0("run-", RUN, "_ROI-", ROI, "$"),
+                      x = names(df), 
+                      value = TRUE) %>%
+                 df[,.]
+      
+      ## Iterating through the Different Combinations
+      for (PID1 in 1:(ncol(df_cor_) - 1)){
+        for (PID2 in 2:ncol(df_cor_)){
+          if (PID2 > PID1){
             
-            ## Make the generated dataframe the standard
-            df_cor <- df_temp
-          }
-          
-          ## If this is a later iteration
-          if (PID1 != 1 | PID2 != 2){
+            # Creating a new dataframe with the structure of df_cor
+            df_temp <- df_model
             
-            ## Bind the rows together
-            df_cor <- rbind(df_cor,
-                            df_temp)
+            # Filling in information
+            df_temp$PID1 <- sub("(_run-.*)", "", names(df_cor_)[PID1])
+            df_temp$PID2 <- sub("(_run-.*)", "", names(df_cor_)[PID2])
+            df_temp$Run <- RUN
+            df_temp$Region <- ROI
+            df_temp$Window <- 1:nrow(df_temp)
+            df_temp$Value_Cor_Neuro <- Sliding_Window_Cor(x = df_cor_[,PID1],
+                                                          y = df_cor_[,PID2],
+                                                          window_size = Window_Size)
+            
+            ## If this is the first iteration
+            if (PID1 == 1 & PID2 == 2){
+              
+              ## Make the generated dataframe the standard
+              df_cor <- df_temp
+            }
+            
+            ## If this is a later iteration
+            if (PID1 != 1 | PID2 != 2){
+              
+              ## Bind the rows together
+              df_cor <- rbind(df_cor,
+                              df_temp)
+            }
           }
         }
+        
+        # Print Progress
+        print(paste0("RUN: ", RUN, " | ROI: ", ROI, " | PID1: ", PID1))
       }
       
-      # Print Progress
-      print(paste0("RUN: ", RUN, " | ROI: ", ROI, " | PID1: ", PID1))
+      ## Save the current dataframe
+      write.csv(df_cor,
+                paste0(here(),"/Data/Sliding_Window/nROI-", nROI,"_WinSize-", WINDOW,"_Run-",RUN,"_ROI-", ROI,".csv"))
     }
-    
-    ## Save the current dataframe
-    write.csv(df_cor,
-              paste0(here(),"/Data/Sliding_Window/nROI-", nROI,"_WinSize-", Window_Size,"_Run-",RUN,"_ROI-", ROI,".csv"))
   }
 }
 
