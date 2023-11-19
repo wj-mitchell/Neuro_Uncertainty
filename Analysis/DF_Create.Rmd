@@ -89,17 +89,6 @@ Window_Sizes <- c(30,40,50)
 nROI <- 400
 ```
 
-```{r Creating a new dataframe to host the}
-rows <- 1:(nrow(df) - (Window_Size/2))
-cols <- c("PID1", "PID2", "Run", "Region", "Window", "Value_Cor_Neuro")
-df_model <- as.data.frame(matrix(NA,
-                               nrow = length(rows), 
-                               ncol = length(cols),
-                               dimnames = list(rows, cols)))
-
-rm(rows,cols)
-```
-
 ```{r Initializing our Parallel Processing Capabilities}
 registerDoMC(60)
 ```
@@ -107,6 +96,15 @@ registerDoMC(60)
 ```{r Filling The Dataframe}
 ## Iterating through the different window sizes
 foreach(WINDOW=Window_sizes) %dopar%{
+  
+  ## Creating a model dataframe to store the data
+  rows <- 1:(nrow(df) - (WINDOW/2))
+  cols <- c("PID1", "PID2", "Run", "Region", "Window", "Value_Cor_Neuro")
+  df_model <- as.data.frame(matrix(NA,
+                                 nrow = length(rows), 
+                                 ncol = length(cols),
+                                 dimnames = list(rows, cols)))
+  rm(rows,cols)
 
   ## Iterating through each run
   foreach(RUN=1:2)  %dopar% {
