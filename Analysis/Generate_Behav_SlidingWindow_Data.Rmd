@@ -1,0 +1,141 @@
+---
+title: "Generate_Behav_SlidingWindow_Data"
+author: "William J. Mitchell"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r Setup}
+## Loading Packages
+pacman::p_load(doMC,
+               foreach,
+               here,  
+               parallel,
+               tidyverse)
+
+## Adding custom function
+source("https://raw.githubusercontent.com/wj-mitchell/neuRotools/main/Sliding_Window_Cor.R", local= T)
+source("https://raw.githubusercontent.com/wj-mitchell/neuRotools/main/HRF_convolve.R", local= T)
+```
+
+```{r Reading in Data}
+df <- read.csv(paste0(here(), "/Data/df_behav_.csv"),
+               row.names = 1)
+```
+
+```{r Converting SecondEnd to TRs}
+df$TR <- (df$SecondEnd - 17) / 2
+df$PID <- paste0(df$PID, "_", df$Condition)
+```
+
+```{r Subsetting the Data We Need}
+df <- df %>%
+      subset(select = c("PID", "CertRate", "TR")) %>%
+      pivot_wider(names_from = "PID",
+                  values_from = "CertRate")
+```
+
+```{r Detrending, Standardizing, Absoluting, and Convolving All Ratings}
+for (COLUMN in 2:ncol(df)){
+  df[,COLUMN] <- df[,COLUMN] %>%
+                 unlist() %>%
+                 as.numeric() %>%
+                 diff() %>%
+                 c(0,.) %>%
+                 abs() %>%
+                 scale() %>%
+                 as.numeric() %>%
+                 HRF_convolve(resample_q = 2)
+}
+```
+
+```{r Defining Window Size}
+Window_Sizes <- c(30,40,50)
+```
+
+```{r Adding Parallel Backend}
+registerDoMC(detectCores()/2)
+```
+
+```{r Filling The Dataframe}
+## Iterating through differently sized windows
+foreach(WINDOW=Window_Sizes)  %:% 
+  
+  # Iterating through each condition
+  foreach(COND=c("A","B")) %dopar% {
+  
+    ## Creating a model dataframe to reference
+    rows <- 1:(nrow(df) - (WINDOW/2))
+    cols <- c("PID1", "PID2", "Run", "Window", "Value_Cor_Behav")
+    df_model <- as.data.frame(matrix(NA,
+                                   nrow = length(rows), 
+                                   ncol = length(cols),
+                                   dimnames = list(rows, cols)))
+    rm(rows,cols)
+  
+    ## Identifying the Data that is Comparable to Correlate
+    df_cor_ <- grep(pattern = paste0("_", COND),
+                    x = names(df), 
+                    value = TRUE) %>%
+               df[,.]
+      
+      ## Iterating through the Different Combinations
+      for (PID1 in 1:(ncol(df_cor_) - 1)){
+        for (PID2 in 2:ncol(df_cor_)){
+          if (PID2 > PID1){
+            
+            # Creating a new dataframe with the structure of df_cor
+            df_temp <- df_model
+            
+            # Filling in information
+            df_temp$PID1 <- sub("(_run-.*)", "", names(df_cor_)[PID1])
+            df_temp$PID2 <- sub("(_run-.*)", "", names(df_cor_)[PID2])
+            if (COND == "A"){
+              df_temp$Run <- 1
+            }
+            if (COND == "B"){
+              df_temp$Run <- 2
+            }
+            df_temp$Window <- 1:nrow(df_temp)
+            df_temp$Value_Cor_Neuro <- Sliding_Window_Cor(x = df_cor_[,PID1],
+                                                          y = df_cor_[,PID2],
+                                                          window_size = WINDOW)
+            
+            ## If this is the first iteration
+            if (PID1 == 1 & PID2 == 2){
+              
+              ## Make the generated dataframe the standard
+              df_cor <- df_temp
+            }
+            
+            ## If this is a later iteration
+            if (PID1 != 1 | PID2 != 2){
+              
+              ## Bind the rows together
+              df_cor <- rbind(df_cor,
+                              df_temp)
+            }
+          }
+        }
+        
+        # Print Progress
+        print(paste0("RUN: ", COND, " | PID1: ", PID1))
+      }
+      
+      ## Save the current dataframe
+      if (COND == "A"){
+              write.csv(df_cor,
+                paste0(here(),"/Data/Sliding_Window/Type-Behav_WinSize-", WINDOW,"_Run-1.csv"))
+      }
+      if (COND == "B"){
+              write.csv(df_cor,
+                paste0(here(),"/Data/Sliding_Window/Type-Behav_WinSize-", WINDOW,"_Run-2.csv"))
+      }
+
+  }
+
+```
+
+```{r Cleaning Our Space}
+rm(df_cor_, ROI, RUN)
+```

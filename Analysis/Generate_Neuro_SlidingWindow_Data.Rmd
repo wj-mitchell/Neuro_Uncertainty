@@ -1,5 +1,5 @@
 ---
-title: "DF_Create"
+title: "Generate_Neuro_SlidingWindow_Data"
 author: "William J. Mitchell"
 date: "`r Sys.Date()`"
 output: html_document
@@ -16,8 +16,7 @@ pacman::p_load(doMC,
                tidyverse)
 
 ## Adding custom function
-source("https://raw.githubusercontent.com/wj-mitchell/neuRotools/main/cormat_long.R", local= T)
-source(paste0(here(), "/Analysis/Sliding_Window_Cor.R"), local= T)
+source("https://raw.githubusercontent.com/wj-mitchell/neuRotools/main/Sliding_Window_Cor.R", local= T)
 ```
 
 ```{r Creating an array of the files to be loaded}
@@ -168,8 +167,3 @@ for (WINDOW in Window_Sizes) {
 ```{r Cleaning Our Space}
 rm(df_cor_, ROI, RUN)
 ```
-
-
-
-
-
