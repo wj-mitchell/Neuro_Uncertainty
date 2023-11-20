@@ -108,10 +108,10 @@ for (WINDOW in Window_Sizes) {
   rm(rows,cols)
   
   ## Iterating through each run
-  foreach(RUN=1:1)  %:% 
+  foreach(RUN=1:2)  %:% 
     
     ## and iterating through each of the ROIs
-    foreach(ROI=1:2) %dopar% {
+    foreach(ROI=1:400) %dopar% {
   
       ## Identifying the Data that is Comparable to Correlate
       df_cor_ <- grep(pattern = paste0("run-", RUN, "_ROI-", ROI, "$"),
@@ -155,7 +155,7 @@ for (WINDOW in Window_Sizes) {
         }
         
         # Print Progress
-        print(paste0("RUN: ", RUN, " | ROI: ", ROI, " | PID1: ", PID1))
+        # print(paste0("RUN: ", RUN, " | ROI: ", ROI, " | PID1: ", PID1))
       }
       
       ## Save the current dataframe
