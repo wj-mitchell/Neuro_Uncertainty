@@ -39,9 +39,17 @@ df_qualtrics$TheoryEnd[df_qualtrics$TheoryEnd != "Jonathan Fraser"] <- "Not Jona
 nROI <- 400
 ```
 
+```{r Defining Window Size}
+Window_Sizes <- c(30,40,50)
+```
+
+```{r Adding Parallel Backend}
+registerDoMC(detectCores()/2)
+```
+
 ```{r Reading in Data}
 # Iterating through each of the window sizes we used
-for (WINDOW in c(30, 40, 50)){
+for (WINDOW in Window_Sizes){
   
   # Iterating through each of the runs in this study
   for (RUN in c(1:2)){
