@@ -35,7 +35,7 @@ df_qualtrics$TheoryMid[df_qualtrics$TheoryMid != "Jonathan Fraser"] <- "Not Jona
 df_qualtrics$TheoryEnd[df_qualtrics$TheoryEnd != "Jonathan Fraser"] <- "Not Jonathan Fraser"
 ```
 
-```{Specifying how many ROIs we're using}
+```{r Specifying how many ROIs we're using}
 nROI <- 400
 ```
 
