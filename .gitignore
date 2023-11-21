@@ -1,4 +1,4 @@
 
-/AvgRoi/*.csv
-/Sliding_Window/*.csv
+/Data/AvgRoi/*.csv
+/Data/Sliding_Window/*.csv
 *.Rhistory
