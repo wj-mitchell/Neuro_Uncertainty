@@ -7,170 +7,130 @@ output: html_document
 
 ```{r Setup}
 ## Loading Packages
-pacman::p_load(doMC,
+pacman::p_load(broom.mixed,
+               doMC,
                foreach,
                here,  
-               lmer4,
+               lme4,
                lmerTest,
                parallel,
+               performance,
                tidyverse)
+
+# Sourcing custom functions
+source("https://raw.githubusercontent.com/wj-mitchell/neuRotools/main/lmer_extracter.R", local = T)
+```
+
+```{r Reading in Qualtrics Data}
+# We have a theory that subjects with more similar hypotheses should demonstrate more similar behavior and neural activity, so we're specifically reading that in
+df_qualtrics <- read.csv(paste0(here(), "/Data/df_qualtrics_.csv"),
+                     row.names = 1) %>%
+                select(c("PID", "TheoryMid", "TheoryEnd"))
+
+# Standardizing the PID so that it matches how it appears in the behavioral data
+df_qualtrics$PID <- str_replace(df_qualtrics$PID,pattern = "^SR-", replacement = "sub-")
+
+# Reducing the dimensionality of the theories column 
+df_qualtrics$TheoryMid[df_qualtrics$TheoryMid != "Jonathan Fraser"] <- "Not Jonathan Fraser"
+df_qualtrics$TheoryEnd[df_qualtrics$TheoryEnd != "Jonathan Fraser"] <- "Not Jonathan Fraser"
+```
+
+```{Specifying how many ROIs we're using}
+nROI <- 400
 ```
 
 ```{r Reading in Data}
-for (WINDOW in c(30)){
+# Iterating through each of the window sizes we used
+for (WINDOW in c(30, 40, 50)){
   
-  for (RUN in c(1:1)){
-   
+  # Iterating through each of the runs in this study
+  for (RUN in c(1:2)){
+    
+    # Reading in the behavioral data for this specific window size and run
     df_behav <- read.csv(paste0(here(), "/Data/Sliding_Window/Type-Behav_WinSize-", WINDOW, "_Run-",RUN,".csv"),
                          row.names = 1)
     
-    df_behav$PID1 <- str_replace(string = df_behav$PID1, pattern = "_.$", replacement = "")
-    df_behav$PID2 <- str_replace(string = df_behav$PID2, pattern = "_.$", replacement = "")
-          
+    # Standardizing the PID information to match how it appears in the neuro file
+    df_behav$PID1 <- df_behav$PID1 %>%
+                     str_replace(pattern = "_.$", replacement = "") %>%
+                     str_extract(pattern = "sub-....")
+    df_behav$PID2 <- df_behav$PID2 %>%
+                     str_replace(pattern = "_.$", replacement = "") %>%
+                     str_extract(pattern = "sub-....")
     
-    # df_behav$Pair <- NA
-    # for (ROW in 1:nrow(df_behav)){
-    #   df_behav$Pair[ROW] <- c(df_behav$PID1[ROW], df_behav$PID2[ROW]) %>%
-    #                         sort() %>%
-    #                         paste(., collapse = "_") 
-    # }
-    # df_behav <- df_behav[,-which(names(df_behav) == "PID1" | names(df_behav) == "PID2" )]
+    # Merging the behavioral data with the qualtrics data for both PID1 and PID2
+    df_behav <- merge(df_behav,
+                      df_qualtrics,
+                      by.x = "PID1",
+                      by.y = "PID",
+                      all.x = T) %>%
+                merge(.,
+                      df_qualtrics,
+                      by.x = "PID2",
+                      by.y = "PID",
+                      all.x = T,suffixes = c("_PID1", "_PID2"))
+    
+    # Creating a new column to track whether participants had the same theory or different theories at the mid point
+    df_behav$MidSim <- NA    
+    df_behav$MidSim[df_behav$TheoryMid_PID1 == df_behav$TheoryMid_PID2] <- "Same"
+    df_behav$MidSim[df_behav$TheoryMid_PID1 != df_behav$TheoryMid_PID2] <- "Different" 
 
-    for (ROI in 1:1){
-        
+    # Creating a new column to track whether participants had the same theory or different theories at the end point    
+    df_behav$EndSim <- NA    
+    df_behav$EndSim[df_behav$TheoryEnd_PID1 == df_behav$TheoryEnd_PID2] <- "Same"
+    df_behav$EndSim[df_behav$TheoryEnd_PID1 != df_behav$TheoryEnd_PID2] <- "Different" 
+    
+    # Reducing the columns that we're going to carry forward to the neuro data merger
+    df_behav <- df_behav %>%
+                select(c("PID1", "PID2", "Run", "Window", "Value_Cor_Behav", "MidSim", "EndSim"))
+    
+    # Iterating through out different ROIs
+    foreach(ROI=1:400) %dopar% {
+      
+      # Reading in the data relevant to this window, run, and ROI
       df_neuro <- read.csv(paste0(here(), "/Data/Sliding_Window/nROI-400_WinSize-", WINDOW, "_Run-",RUN,"_ROI-", ROI,".csv"),
                            row.names = 1)
       
-      # df_neuro$Pair <- NA
-      # for (ROW in 1:nrow(df_neuro)){
-      #   df_neuro$Pair[ROW] <- c(df_neuro$PID1[ROW], df_neuro$PID2[ROW]) %>%
-      #                         sort() %>%
-      #                         paste(., collapse = "_") 
-      # }
-      # df_neuro <- df_neuro[,-which(names(df_neuro) == "PID1" | names(df_neuro) == "PID2" )]
-      
+      # Merging out behavioral and neural data together
       df <- merge(x = df_behav,
                   y = df_neuro)
-        
+      
+      # Constructing models to test
+      Null <- lmer(Value_Cor_Behav ~ 1 + (1 | PID1) + (1 | PID2), data = df, REML = F)
+      M1 <- lmer(Value_Cor_Behav ~ Value_Cor_Neuro + (1 | PID1) + (1 | PID2), data = df, REML = F)
+      M2 <- lmer(Value_Cor_Behav ~ Value_Cor_Neuro + Window + (1 | PID1) + (1 | PID2), data = df, REML = F)
+      M3 <- lmer(Value_Cor_Behav ~ Value_Cor_Neuro + MidSim + Window + (1 | PID1) + (1 | PID2), data = df, REML = F)
+      if (RUN == 1){
+        M4 <- lmer(Value_Cor_Behav ~ Value_Cor_Neuro * MidSim + Window + (1 | PID1) + (1 | PID2), data = df, REML = F)
+      }
+      if (RUN == 2){
+        M5 <- lmer(Value_Cor_Behav ~ Value_Cor_Neuro + Window + MidSim + EndSim + (1 | PID1) + (1 | PID2), data = df, REML = F)
+        M6 <- lmer(Value_Cor_Behav ~ Value_Cor_Neuro * EndSim + Window + MidSim + (1 | PID1) + (1 | PID2), data = df, REML = F)
+      }
+
+      # Using out custom function to generate a summary of the models and model comparisons
+      results <- bind_rows(lmer_extracter(New_Model = Null, New_Model_Name = "Null"),
+                       lmer_extracter(Old_Model = Null, Old_Model_Name = "Null", New_Model = M1, New_Model_Name = "M1"),
+                       lmer_extracter(Old_Model = M1, Old_Model_Name = "M1", New_Model = M2, New_Model_Name = "M2"),
+                       lmer_extracter(Old_Model = M2, Old_Model_Name = "M2", New_Model = M3,New_Model_Name = "M3"))    
+      rm(Null,M1,M2)
+      if (RUN == 1){
+        results <- bind_rows(results, 
+                         lmer_extracter(Old_Model = M3, Old_Model_Name = "M3", New_Model = M4, New_Model_Name = "M4"))
+        rm(M3,M4)
+      }
+      if (RUN == 2){
+        results <- bind_rows(results, 
+                         lmer_extracter(Old_Model = M3, Old_Model_Name = "M3", New_Model = M5, New_Model_Name = "M5"),
+                         lmer_extracter(Old_Model = M5, Old_Model_Name = "M5", New_Model = M6, New_Model_Name = "M6"))
+        rm(M3,M5,M6)
+                         
+      }
+      
+      # Exporting the results
+      write.csv(results, file = paste0(here(),"/Data/Sliding_Window/Results/nROI-", nROI,"_WinSize-", WINDOW,"_Run-",RUN,"_ROI-", ROI,"_ModelResults.csv"))
     }
   }
 }
-
-```
-
-```{r Converting SecondEnd to TRs}
-df$TR <- (df$SecondEnd - 17) / 2
-df$PID <- paste0(df$PID, "_", df$Condition)
-```
-
-```{r Subsetting the Data We Need}
-df <- df %>%
-      subset(select = c("PID", "CertRate", "TR")) %>%
-      pivot_wider(names_from = "PID",
-                  values_from = "CertRate")
-```
-
-```{r Detrending, Standardizing, Absoluting, and Convolving All Ratings}
-for (COLUMN in 2:ncol(df)){
-  df[,COLUMN] <- df[,COLUMN] %>%
-                 unlist() %>%
-                 as.numeric() %>%
-                 diff() %>%
-                 c(0,.) %>%
-                 abs() %>%
-                 scale() %>%
-                 as.numeric() %>%
-                 HRF_convolve(resample_q = 2)
-}
-```
-
-```{r Defining Window Size}
-Window_Sizes <- c(30,40,50)
-```
-
-```{r Adding Parallel Backend}
-registerDoMC(detectCores()/2)
-```
-
-```{r Filling The Dataframe}
-## Iterating through differently sized windows
-foreach(WINDOW=Window_Sizes)  %:% 
-  
-  # Iterating through each condition
-  foreach(COND=c("A","B")) %dopar% {
-  
-    ## Creating a model dataframe to reference
-    rows <- 1:(nrow(df) - (WINDOW/2))
-    cols <- c("PID1", "PID2", "Run", "Window", "Value_Cor_Behav")
-    df_model <- as.data.frame(matrix(NA,
-                                   nrow = length(rows), 
-                                   ncol = length(cols),
-                                   dimnames = list(rows, cols)))
-    rm(rows,cols)
-  
-    ## Identifying the Data that is Comparable to Correlate
-    df_cor_ <- grep(pattern = paste0("_", COND),
-                    x = names(df), 
-                    value = TRUE) %>%
-               df[,.]
-      
-      ## Iterating through the Different Combinations
-      for (PID1 in 1:(ncol(df_cor_) - 1)){
-        for (PID2 in 2:ncol(df_cor_)){
-          if (PID2 > PID1){
-            
-            # Creating a new dataframe with the structure of df_cor
-            df_temp <- df_model
-            
-            # Filling in information
-            df_temp$PID1 <- sub("(_run-.*)", "", names(df_cor_)[PID1])
-            df_temp$PID2 <- sub("(_run-.*)", "", names(df_cor_)[PID2])
-            if (COND == "A"){
-              df_temp$Run <- 1
-            }
-            if (COND == "B"){
-              df_temp$Run <- 2
-            }
-            df_temp$Window <- 1:nrow(df_temp)
-            df_temp$Value_Cor_Behav <- Sliding_Window_Cor(x = as.numeric(unlist(df_cor_[,PID1])),
-                                                          y = as.numeric(unlist(df_cor_[,PID2])),
-                                                          window_size = WINDOW)
-            
-            ## If this is the first iteration
-            if (PID1 == 1 & PID2 == 2){
-              
-              ## Make the generated dataframe the standard
-              df_cor <- df_temp
-            }
-            
-            ## If this is a later iteration
-            if (PID1 != 1 | PID2 != 2){
-              
-              ## Bind the rows together
-              df_cor <- rbind(df_cor,
-                              df_temp)
-            }
-          }
-        }
-        
-        # Print Progress
-        print(paste0("RUN: ", COND, " | PID1: ", PID1))
-      }
-      
-      ## Save the current dataframe
-      if (COND == "A"){
-              write.csv(df_cor,
-                paste0(here(),"/Data/Sliding_Window/Type-Behav_WinSize-", WINDOW,"_Run-1.csv"))
-      }
-      if (COND == "B"){
-              write.csv(df_cor,
-                paste0(here(),"/Data/Sliding_Window/Type-Behav_WinSize-", WINDOW,"_Run-2.csv"))
-      }
-
-  }
-
-```
-
-```{r Cleaning Our Space}
-rm(df_cor_)
+rm(RUN, WINDOW, ROI, df_behav, df_neuro, df)
 ```
