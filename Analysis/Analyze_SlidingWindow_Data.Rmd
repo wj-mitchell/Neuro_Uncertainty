@@ -10,24 +10,57 @@ output: html_document
 pacman::p_load(doMC,
                foreach,
                here,  
+               lmer4,
+               lmerTest,
                parallel,
                tidyverse)
-
-## Adding custom function
-source("https://raw.githubusercontent.com/wj-mitchell/neuRotools/main/Sliding_Window_Cor.R", local= T)
-source("https://raw.githubusercontent.com/wj-mitchell/neuRotools/main/HRF_convolve.R", local= T)
 ```
 
 ```{r Reading in Data}
-df <- read.csv(paste0(here(), "/Data/df_behav_.csv"),
-               row.names = 1)
+for (WINDOW in c(30)){
+  
+  for (RUN in c(1:1)){
+   
+    df_behav <- read.csv(paste0(here(), "/Data/Sliding_Window/Type-Behav_WinSize-", WINDOW, "_Run-",RUN,".csv"),
+                         row.names = 1)
+    
+    df_behav$PID1 <- str_replace(string = df_behav$PID1, pattern = "_.$", replacement = "")
+    df_behav$PID2 <- str_replace(string = df_behav$PID2, pattern = "_.$", replacement = "")
+          
+    
+    # df_behav$Pair <- NA
+    # for (ROW in 1:nrow(df_behav)){
+    #   df_behav$Pair[ROW] <- c(df_behav$PID1[ROW], df_behav$PID2[ROW]) %>%
+    #                         sort() %>%
+    #                         paste(., collapse = "_") 
+    # }
+    # df_behav <- df_behav[,-which(names(df_behav) == "PID1" | names(df_behav) == "PID2" )]
+
+    for (ROI in 1:1){
+        
+      df_neuro <- read.csv(paste0(here(), "/Data/Sliding_Window/nROI-400_WinSize-", WINDOW, "_Run-",RUN,"_ROI-", ROI,".csv"),
+                           row.names = 1)
+      
+      # df_neuro$Pair <- NA
+      # for (ROW in 1:nrow(df_neuro)){
+      #   df_neuro$Pair[ROW] <- c(df_neuro$PID1[ROW], df_neuro$PID2[ROW]) %>%
+      #                         sort() %>%
+      #                         paste(., collapse = "_") 
+      # }
+      # df_neuro <- df_neuro[,-which(names(df_neuro) == "PID1" | names(df_neuro) == "PID2" )]
+      
+      df <- merge(x = df_behav,
+                  y = df_neuro)
+        
+    }
+  }
+}
+
 ```
 
 ```{r Converting SecondEnd to TRs}
 df$TR <- (df$SecondEnd - 17) / 2
-df$PID <- str_replace(df$PID,pattern = "^SR-", replacement = "sub-")
 df$PID <- paste0(df$PID, "_", df$Condition)
-
 ```
 
 ```{r Subsetting the Data We Need}
