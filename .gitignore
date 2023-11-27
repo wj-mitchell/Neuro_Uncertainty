@@ -1,4 +1,5 @@
 
 /Data/AvgRoi/*.csv
 /Data/Sliding_Window/*.csv
-*.Rhistory
+/Data/Sliding_Window/Results/*.csv
+/*/.Rhistory

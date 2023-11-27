@@ -7,14 +7,12 @@ output: html_document
 
 ```{r Setup}
 ## Loading Packages
-pacman::p_load(broom.mixed,
-               doMC,
+pacman::p_load(doMC,
                foreach,
                here,  
                lme4,
                lmerTest,
                parallel,
-               performance,
                tidyverse)
 
 # Sourcing custom functions
@@ -47,7 +45,19 @@ Window_Sizes <- c(30,40,50)
 registerDoMC(detectCores()/2)
 ```
 
-```{r Reading in Data}
+```{r Creating a Fisher's Z function}
+fishers_z <- function(r) {
+  if (any(r > 0.999)){
+    r[which(r > 0.999)] <- 0.999
+  }
+  if (any(r < -0.999)){
+    r[which(r < -0.999)] <- -0.999
+  }
+  return(0.5 * log((1 + r)/(1 - r)))
+}
+```
+
+```{r Reading in Data, warning=FALSE}
 # Iterating through each of the window sizes we used
 for (WINDOW in Window_Sizes){
   
@@ -92,12 +102,18 @@ for (WINDOW in Window_Sizes){
     df_behav <- df_behav %>%
                 select(c("PID1", "PID2", "Run", "Window", "Value_Cor_Behav", "MidSim", "EndSim"))
     
+    # Applying a Fisher's Z Transform to the Correlation Data
+    df_behav$Value_Cor_Behav <- fishers_z(df_behav$Value_Cor_Behav)
+    
     # Iterating through out different ROIs
-    foreach(ROI=1:400) %dopar% {
+    foreach(ROI=1:nROI) %dopar% {
       
       # Reading in the data relevant to this window, run, and ROI
       df_neuro <- read.csv(paste0(here(), "/Data/Sliding_Window/nROI-400_WinSize-", WINDOW, "_Run-",RUN,"_ROI-", ROI,".csv"),
                            row.names = 1)
+      
+      # Applying a Fisher's Z Transform to the Correlation Data
+      df_neuro$Value_Cor_Neuro <- fishers_z(df_neuro$Value_Cor_Neuro)
       
       # Merging out behavioral and neural data together
       df <- merge(x = df_behav,
@@ -112,27 +128,26 @@ for (WINDOW in Window_Sizes){
         M4 <- lmer(Value_Cor_Behav ~ Value_Cor_Neuro * MidSim + Window + (1 | PID1) + (1 | PID2), data = df, REML = F)
       }
       if (RUN == 2){
-        M5 <- lmer(Value_Cor_Behav ~ Value_Cor_Neuro + Window + MidSim + EndSim + (1 | PID1) + (1 | PID2), data = df, REML = F)
+        M5 <- lmer(Value_Cor_Behav ~ Value_Cor_Neuro + EndSim + Window + MidSim + (1 | PID1) + (1 | PID2), data = df, REML = F)
         M6 <- lmer(Value_Cor_Behav ~ Value_Cor_Neuro * EndSim + Window + MidSim + (1 | PID1) + (1 | PID2), data = df, REML = F)
       }
 
       # Using out custom function to generate a summary of the models and model comparisons
       results <- bind_rows(lmer_extracter(New_Model = Null, New_Model_Name = "Null"),
-                       lmer_extracter(Old_Model = Null, Old_Model_Name = "Null", New_Model = M1, New_Model_Name = "M1"),
-                       lmer_extracter(Old_Model = M1, Old_Model_Name = "M1", New_Model = M2, New_Model_Name = "M2"),
-                       lmer_extracter(Old_Model = M2, Old_Model_Name = "M2", New_Model = M3,New_Model_Name = "M3"))    
+                           lmer_extracter(Old_Model = Null, Old_Model_Name = "Null", New_Model = M1, New_Model_Name = "M1"),
+                           lmer_extracter(Old_Model = M1, Old_Model_Name = "M1", New_Model = M2, New_Model_Name = "M2"),
+                           lmer_extracter(Old_Model = M2, Old_Model_Name = "M2", New_Model = M3,New_Model_Name = "M3"))    
       rm(Null,M1,M2)
       if (RUN == 1){
         results <- bind_rows(results, 
-                         lmer_extracter(Old_Model = M3, Old_Model_Name = "M3", New_Model = M4, New_Model_Name = "M4"))
+                             lmer_extracter(Old_Model = M3, Old_Model_Name = "M3", New_Model = M4, New_Model_Name = "M4"))
         rm(M3,M4)
       }
       if (RUN == 2){
         results <- bind_rows(results, 
-                         lmer_extracter(Old_Model = M3, Old_Model_Name = "M3", New_Model = M5, New_Model_Name = "M5"),
-                         lmer_extracter(Old_Model = M5, Old_Model_Name = "M5", New_Model = M6, New_Model_Name = "M6"))
+                             lmer_extracter(Old_Model = M3, Old_Model_Name = "M3", New_Model = M5, New_Model_Name = "M5"),
+                             lmer_extracter(Old_Model = M5, Old_Model_Name = "M5", New_Model = M6, New_Model_Name = "M6"))
         rm(M3,M5,M6)
-                         
       }
       
       # Exporting the results
