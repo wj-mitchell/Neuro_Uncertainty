@@ -1,0 +1,152 @@
+---
+title: "Reviewing_SlidingWindow_Analysis"
+author: "William J Mitchell"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+## Loading Packages
+pacman::p_load(here,
+               tidyverse)
+
+```
+
+```{r Creating an array of the files to be loaded}
+files <- list.files(paste0(here(), "/Data/Sliding_Window/Results"), 
+                    full.names = TRUE)
+```
+
+```{r Constructing a Dataframe of ratings}
+## Iterating through each of these files
+for (FILE in 1:length(files)){
+  
+  ## Reading in the data for this iteration
+  df_ <- read.csv(files[FILE],
+                  row.names = 1)
+
+  ## Identifying the Run for this participant
+  Window_Size <- sub(".*/.*_(WinSize-\\d+)_.*", "\\1", files[FILE]) %>%
+                 str_extract("[0-9][0-9]$") %>%
+                 as.numeric()
+      
+  ## Identifying the Run for this participant
+  Run <- sub(".*/.*_(Run-\\d+)_.*", "\\1", files[FILE]) %>%
+         str_extract("[0-9]$") %>%
+         as.numeric()
+  
+  ## Identifying the Run for this participant
+  ROI <- sub(".*/.*_(ROI-\\d+)_.*", "\\1", files[FILE]) %>%
+         str_extract("[0-9].*$") %>%
+         as.numeric()
+  
+  ## Adding additional information to the dataframe
+  df_$Window_Size <- Window_Size
+  df_$Run <- Run
+  df_$ROI <- ROI
+ 
+  ## If this is the first file
+  if (FILE == 1){
+    
+    ## Make it the standard
+    df <- df_
+  }
+  
+  ## If it's a later file
+  if (FILE > 1){
+    
+    ## Bind the columns together
+    df <- rbind(df, df_)
+  }
+}
+  
+## Cleaning the space
+rm(Run, Window_Size, ROI, files, FILE, df_)
+```
+
+```{r Reorganizing the dataframe}
+df <- df %>%
+      select(c("Window_Size", "Run", "ROI", "Model", "term", "estimate", 
+               "std.error", "statistic", "df", "p.value", "ICC_adj", 
+               "ModelComparison", "Base_npar", "Base_AIC", "Base_BIC",
+               "Base_logLik", "Base_deviance", "Compare_npar", "Compare_AIC", 
+               "Compare_BIC", "Compare_logLik", "Compare_deviance", "Chisq", 
+               "Df", "Pr..Chisq."))
+```
+
+```{r Reading in ROI data}
+df_ROI <- read.table(paste0(here(), "/Pre-Processing/dir_ROIs/ROIs_Schaefer.txt"))
+```
+
+```{r Replacing ROI numbers with Titles to Increase Legibility}
+df$ROI_cat <- NA
+for (ROI in 1:nrow(df_ROI)){
+  df$ROI_cat[df$ROI == ROI] <- df_ROI$V1[ROI]
+}
+```
+
+```{r Focusing on the interaction term of the 50s window sizes for Run 1 in Model 4}
+df_results_R1 <- df %>%
+              subset(.$Window_Size == 50 & .$Run == 1 & .$Model == "M4" & .$term == "Value_Cor_Neuro:MidSimSame")
+```
+
+```{r Calculating the median model fit of Model 4}
+median(df_results_R1$Pr..Chisq.)
+```
+
+```{r Adjusting the P Values to Maintain FWER at 0.05}
+df_results_R1$p.value_adj <- p.adjust(df_results_R1$p.value, method = "bonferroni") 
+```
+
+```{r Filtering which regions maintain significance after the adjustment}
+df_results_R1_sub <- df_results_R1 %>%
+              subset(.$p.value_adj < 0.001)
+```
+
+```{r Focusing on the interaction term of the 50s window sizes for Run 2 in Model 6}
+df_results_R2 <- df %>%
+              subset(.$Window_Size == 50 & .$Run == 2 & .$Model == "M6" & .$term == "Value_Cor_Neuro:EndSimSame")
+```
+
+```{r Calculating the median model fit of Model 6}
+median(df_results_R2$Pr..Chisq.)
+```
+
+```{r Adjusting the P Values to Maintain FWER at 0.05}
+df_results_R2$p.value_adj <- p.adjust(df_results_R2$p.value, method = "bonferroni") 
+```
+
+```{r Filtering which regions maintain significance after the adjustment}
+df_results_R2_sub<- df_results_R2 %>%
+              subset(.$p.value < 0.001)
+```
+
+```{r Combining results and finding commonalities across both runs}
+df_exp <- rbind(df_results_R1_sub,df_results_R2_sub) %>%
+          select(c("ROI", "ROI_cat", "estimate", "std.error", "statistic", "df", "p.value_adj")) %>%
+          group_by(ROI) %>%
+          summarize(count = n(),
+                    estimate = mean(estimate),
+                    std.error = mean(std.error),
+                    statistic = mean(statistic),
+                    df = mean(df),
+                    p.value_adj = mean(p.value_adj)) %>%
+          ungroup() %>%
+          subset(.$count > 1 & .$p.value_adj < 0.001)
+```
+
+```{r Saving the Average Values Between Both Halves as Values}
+df_avg_ROI <- rbind(df_results_R1,df_results_R2) %>%
+              select(c("ROI", "ROI_cat", "estimate", "std.error", "statistic", "df", "p.value_adj")) %>%
+              group_by(ROI) %>%
+              summarize(ROI_cat = ROI_cat[1], 
+                        count = n(),
+                        estimate = mean(estimate),
+                        std.error = mean(std.error),
+                        statistic = mean(statistic),
+                        df = mean(df),
+                        p.value_adj = mean(p.value_adj)) %>%
+              ungroup()
+
+write.csv(df_avg_ROI, paste0(here(), "/Data/Sliding_Window/df_avg_resultsROI.csv"))
+```

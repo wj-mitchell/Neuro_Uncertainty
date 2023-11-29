@@ -2,4 +2,7 @@
 /Data/AvgRoi/*.csv
 /Data/Sliding_Window/*.csv
 /Data/Sliding_Window/Results/*.csv
-/*/.Rhistory
+/*.Rhistory
+/*/*.tiff
+.Rhistory
+.Rhistory
