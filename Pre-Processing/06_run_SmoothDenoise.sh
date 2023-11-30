@@ -6,7 +6,7 @@ PROJECT=/data/Uncertainty
 # SCRIPTS should contain this file, your heuristic.py file (eventually), and your text file containing your list of participants.
 SCRIPTS=${PROJECT}/scripts
 # Denotes which script we want to control
-SCRIPTNAME=${SCRIPTS}/*_script_SmoothDenoise.py
+SCRIPTNAME=${SCRIPTS}/Pre-Processing/*_script_SmoothDenoise.py
 
 # Iterate through each ROI resolution
 for ROISIZE in 100 200 300 400; do

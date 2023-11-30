@@ -38,15 +38,16 @@ def make_motion_covariates(mc, tr):
 print("Smoothing and Denoising has begun! | " + str(datetime.datetime.now()))
 
 # Reading in cortical parcellations
-# This is the Schaefer Parcellation 
-mask = Brain_Data(str('/data/tools/schaefer_parcellations/MNI/Schaefer2018_', ROIsize ,'Parcels_Kong2022_17Networks_order_FSLMNI152_1mm.nii.gz'))
+# This is the Schaefer Parcellation
+parcellation = '/data/tools/schaefer_parcellations/MNI/Schaefer2018_'+ ROIsize + 'Parcels_Kong2022_17Networks_order_FSLMNI152_1mm.nii.gz'
+mask = Brain_Data(parcellation)
 print("Neurosynth parcellations have downloaded! | " + str(datetime.datetime.now()))
 
 # Identifying all preprocessed bold files
 file_list = [x for x in glob.glob(os.path.join(data_dir, 'sub-*/func/*uncertainty_run*preproc_bold*gz'))] 
 
 # Identifying all preprocessed bold files that have already been denoised
-completed_list = [x for x in glob.glob(os.path.join(data_dir, 'sub-*/func/*uncertainty_run*preproc_bold*gz')) if 'denoise' in x] 
+completed_list = [x for x in glob.glob(os.path.join(data_dir, 'sub-*/func/*uncertainty_run*preproc_bold*gz')) if ('denoise_smooth'+ str(fwhm) + 'mm_nROI-' + ROIsize) in x] 
 
 # Removing participants who have already completed their denoising
 for f in completed_list:
@@ -105,7 +106,7 @@ for f in file_list:
     print("Writing " + str(sub) + "'s " + str(run) + " .hdf5 data | " + str(datetime.datetime.now()))  
 
     # Converting the nifti file to .hdf5 files 
-    stats['residual'].write(os.path.join(data_dir, sub, 'func', f'{sub}_task-{task}_{run}_space-MNI152NLin2009cAsym_desc-preproc_bold_denoise_smooth{fwhm}mm__nROI-{ROIsize}.hdf5'))
+    stats['residual'].write(os.path.join(data_dir, sub, 'func', f'{sub}_task-{task}_{run}_space-MNI152NLin2009cAsym_desc-preproc_bold_denoise_smooth{fwhm}mm_nROI-{ROIsize}.hdf5'))
     print("Writing " + str(sub) + "'s " + str(run) + " average ROI data | " + str(datetime.datetime.now()))
 
     # Reading in the cortical parcellations as masks 
