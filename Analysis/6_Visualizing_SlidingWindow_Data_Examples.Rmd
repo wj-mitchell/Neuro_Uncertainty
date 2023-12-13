@@ -1,0 +1,165 @@
+---
+title: "Visualizing_SlidingWindow_Data_Examples"
+author: "William J Mitchell"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+## Loading Packages
+pacman::p_load(doMC,
+               foreach,
+               here,
+               parallel,
+               tidyverse)
+```
+
+```{r}
+# examples <- c(58, 80, 109, 130, 161, 192, 197, 209, 247, 349)
+```
+
+```{r Creating a Fisher's Z function}
+fishers_z <- function(r) {
+  if (any(r > 0.999)){
+    r[which(r > 0.999)] <- 0.999
+  }
+  if (any(r < -0.999)){
+    r[which(r < -0.999)] <- -0.999
+  }
+  return(0.5 * log((1 + r)/(1 - r)))
+}
+```
+
+```{r Reading in Qualtrics Data}
+# We have a theory that subjects with more similar hypotheses should demonstrate more similar behavior and neural activity, so we're specifically reading that in
+df_qualtrics <- read.csv(paste0(here(), "/Data/df_qualtrics_.csv"),
+                     row.names = 1) %>%
+                select(c("PID", "TheoryMid", "TheoryEnd"))
+
+# Standardizing the PID so that it matches how it appears in the behavioral data
+df_qualtrics$PID <- str_replace(df_qualtrics$PID,pattern = "^SR-", replacement = "sub-")
+
+# Reducing the dimensionality of the theories column 
+df_qualtrics$TheoryMid[df_qualtrics$TheoryMid != "Jonathan Fraser"] <- "Not Jonathan Fraser"
+df_qualtrics$TheoryEnd[df_qualtrics$TheoryEnd != "Jonathan Fraser"] <- "Not Jonathan Fraser"
+```
+
+```{r Adding Parallel Backend}
+registerDoMC(detectCores()/2)
+```
+
+```{r}
+## Iterating through each of these files
+foreach(ROI=1:400) %:% 
+  
+  foreach(RUN=1:2) %dopar% {
+  
+    # Reading in the behavioral data for this specific window size and run
+    df_behav <- read.csv(paste0(here(), 
+                                "/Data/Sliding_Window/Type-Behav_WinSize-50_Run-",
+                                RUN,".csv"),
+                         row.names = 1)
+    
+    # Standardizing the PID information to match how it appears in the neuro file
+    df_behav$PID1 <- df_behav$PID1 %>%
+                     str_replace(pattern = "_.$", replacement = "") %>%
+                     str_extract(pattern = "sub-....")
+    df_behav$PID2 <- df_behav$PID2 %>%
+                     str_replace(pattern = "_.$", replacement = "") %>%
+                     str_extract(pattern = "sub-....")
+    
+    # Merging the behavioral data with the qualtrics data for both PID1 and PID2
+    df_behav <- merge(df_behav,
+                      df_qualtrics,
+                      by.x = "PID1",
+                      by.y = "PID",
+                      all.x = T) %>%
+                merge(.,
+                      df_qualtrics,
+                      by.x = "PID2",
+                      by.y = "PID",
+                      all.x = T,suffixes = c("_PID1", "_PID2"))
+    
+    # Creating a new column to track whether participants had the same theory or different theories at the mid point
+    df_behav$MidSim <- NA    
+    df_behav$MidSim[df_behav$TheoryMid_PID1 == df_behav$TheoryMid_PID2] <- "Same"
+    df_behav$MidSim[df_behav$TheoryMid_PID1 != df_behav$TheoryMid_PID2] <- "Different" 
+
+    # Creating a new column to track whether participants had the same theory or different theories at the end point    
+    df_behav$EndSim <- NA    
+    df_behav$EndSim[df_behav$TheoryEnd_PID1 == df_behav$TheoryEnd_PID2] <- "Same"
+    df_behav$EndSim[df_behav$TheoryEnd_PID1 != df_behav$TheoryEnd_PID2] <- "Different" 
+    
+    # Reducing the columns that we're going to carry forward to the neuro data merger
+    df_behav <- df_behav %>%
+                select(c("PID1", "PID2", "Run", "Window", "Value_Cor_Behav", "MidSim", "EndSim"))
+    
+    # Applying a Fisher's Z Transform to the Correlation Data
+    df_behav$Value_Cor_Behav_fz <- fishers_z(df_behav$Value_Cor_Behav)
+    
+    # Reading in the data relevant to this window, run, and ROI
+    df_neuro <- read.csv(paste0(here(), 
+                                "/Data/Sliding_Window/nROI-400_WinSize-50_Run-",RUN,"_ROI-", ROI,".csv"),
+                         row.names = 1)
+    
+    # Applying a Fisher's Z Transform to the Correlation Data
+    df_neuro$Value_Cor_Neuro_fz <- fishers_z(df_neuro$Value_Cor_Neuro)
+    
+    # Merging out behavioral and neural data together
+    df_ <- merge(x = df_behav,
+                 y = df_neuro)
+    
+    for (METHOD in c("loess", "lm")){
+      
+      if (METHOD == "loess"){
+         method <- geom_smooth(method = METHOD, linewidth = 4.5) 
+      }
+      if (METHOD == "lm"){
+        method <- stat_smooth(method = METHOD, linewidth = 4.5)
+      }
+
+    
+      ## If this is the first file
+      if (RUN == 1 & METHOD == "lm"){
+
+          Plot <- ggplot(data = df_, aes(x = Value_Cor_Neuro, y = Value_Cor_Behav, color = EndSim)) +
+                       method +
+                       scale_color_discrete("Theory Similarity") +
+                       labs(x = "Neural Similarity",
+                            y ="Behavioral Similarity") +
+                       coord_cartesian(x = c(-0.7,0.7), y = c(0.4,1)) + 
+                       theme_classic() +  
+                       theme(axis.title = element_text(size = 32, color = "Black")) +
+                       theme(axis.text.x = element_text(size = 36, color = "Black")) +
+                       theme(axis.text.y = element_text(size = 30, color = "Black"))
+        
+      }
+      
+      ## If it's a later file
+      if (RUN > 1){
+
+          Plot <- ggplot(data = df_, aes(x = Value_Cor_Neuro, y = Value_Cor_Behav, color = EndSim)) +
+                       method +
+                       scale_color_discrete("Theory Similarity") +
+                       labs(x = "Neural Similarity",
+                            y ="Behavioral Similarity") +
+                       coord_cartesian(x = c(-0.7,0.7), y = c(0.4,1)) + 
+                       theme_classic() +  
+                       theme(axis.title = element_text(size = 32, color = "Black")) +
+                       theme(axis.text.x = element_text(size = 36, color = "Black")) +
+                       theme(axis.text.y = element_text(size = 30, color = "Black"))
+        
+      }
+      
+      if (RUN != 1 & METHOD != "lm"){
+        tiff(paste0(here(), "/Plots/nROI-400_WinSize-50_Run-", RUN, "_ROI-", ROI,"_Plot-", METHOD, ".tiff"),
+             res = 300,
+             units = "in",
+             width = 12, 
+             height = 9)
+        print(Plot)
+        dev.off()
+      }
+    }
+}
+```
