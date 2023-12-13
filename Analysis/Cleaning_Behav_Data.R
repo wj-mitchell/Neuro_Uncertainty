@@ -6,11 +6,11 @@ pacman::p_load(here,
 source("https://raw.githubusercontent.com/wj-mitchell/neuRotools/main/rucleaner.R", local = T)
 
 # Noting which directory the behavioral data is stored in
-dir <- paste0(here(),"/data/task/")
+DataDir <- "S:/Helion_Group/studies/uncertainty/studies_neuro/data/task/"
 
 # Noting the index number of all .csv files in the directory
 filenums <- grep(pattern = "*\\.csv",
-                 x = list.files(path = dir))
+                 x = list.files(path = DataDir))
 
 # Iterating through sequential integers up to the total number of .csvs
 # Taking this approach rather than using the index numbers directly makes
@@ -20,8 +20,8 @@ filenums <- grep(pattern = "*\\.csv",
 for (i in 1:length(filenums)) {
   # Running the cleaner function for an individual file within the noted directory
   df_temp <- rucleaner(
-    file = list.files(path = dir)[filenums[i]],
-    dir = dir,
+    file = list.files(path = DataDir)[filenums[i]],
+    dir = DataDir,
     unit_secs = 2,
     shave_secs = 17
   )
@@ -94,21 +94,21 @@ df_behav_group$cert_end <-  abs(df_behav$CertRate[df_behav$SecondEnd == 1337])
 ## Exporting these dataframes
 write.csv(
   df_behav_FH,
-  paste0(here(), "/analysis/df_behav.csv")
+  paste0(here(), "/Data/df_behav.csv")
 )
 write.csv(
   df_behav_FH,
-  paste0(here(), "/analysis/df_behav_FH.csv")
+  paste0(here(), "/Data/df_behav_FH.csv")
 )
 write.csv(
   df_behav_SH,
-  paste0(here(), "/analysis/df_behav_SH.csv")
+  paste0(here(), "/Data/df_behav_SH.csv")
 )
 write.csv(
   df_behav_CTRL,
-  paste0(here(), "/analysis/df_behav_CTRL.csv")
+  paste0(here(), "/Data/df_behav_CTRL.csv")
 )
 write.csv(
   df_behav_group,
-  paste0(here(), "/analysis/df_behav_group.csv")
+  paste0(here(), "/Data/df_behav_group.csv")
 )
