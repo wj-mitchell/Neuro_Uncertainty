@@ -44,7 +44,7 @@ for (COLUMN in 2:ncol(df)){
                  as.numeric() %>%
                  diff() %>%
                  c(0,.) %>%
-                 abs() %>%
+                 # abs() %>%
                  scale() %>%
                  as.numeric() %>%
                  HRF_convolve(resample_q = 2)
